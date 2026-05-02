@@ -4,37 +4,43 @@ const axios = require("axios");
 require("dotenv").config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
 const API_KEY = process.env.OPENAI_API_KEY;
 
-// Health check
+// اختبار السيرفر
 app.get("/", (req, res) => {
-    res.send("Emotion API is running 🚀");
+    res.send("Emotion AI API Running 🚀");
 });
 
 // تحليل المشاعر
 app.post("/analyze", async (req, res) => {
     try {
-        const userText = req.body.text;
+        const { text } = req.body;
 
-        if (!userText) {
-            return res.status(400).json({ error: "No text provided" });
+        if (!text) {
+            return res.status(400).json({ error: "Text is required" });
         }
 
-        const response = await axios.post(
+        const aiResponse = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
                 model: "gpt-4o-mini",
                 messages: [
                     {
+                        role: "system",
+                        content: "أنت محلل نفسي ذكي"
+                    },
+                    {
                         role: "user",
                         content: `
-حلل المشاعر في النص التالي بشكل عميق:
-"${userText}"
+حلل النص التالي تحليل عميق:
 
-ارجع JSON فقط بدون شرح:
+"${text}"
+
+ارجع JSON فقط:
 {
 "emotion": "",
 "confidence": 0,
@@ -53,24 +59,26 @@ app.post("/analyze", async (req, res) => {
             }
         );
 
-        const aiText = response.data.choices[0].message.content;
+        const raw = aiResponse.data.choices[0].message.content;
 
-        // نحاول نحوله JSON
-        let parsed;
+        let result;
+
         try {
-            parsed = JSON.parse(aiText);
+            result = JSON.parse(raw);
         } catch {
-            parsed = { raw: aiText };
+            result = { raw };
         }
 
-        res.json(parsed);
+        res.json(result);
 
-    } catch (error) {
-        console.error(error.message);
+    } catch (err) {
+        console.error(err.message);
         res.status(500).json({ error: "Server error" });
     }
 });
 
-app.listen(process.env.PORT, () => {
-    console.log(`Server running on port ${process.env.PORT}`);
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
 });
