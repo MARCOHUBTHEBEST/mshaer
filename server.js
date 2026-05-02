@@ -4,81 +4,86 @@ const axios = require("axios");
 require("dotenv").config();
 
 const app = express();
-
 app.use(cors());
 app.use(express.json());
 
 const API_KEY = process.env.OPENAI_API_KEY;
 
-// اختبار السيرفر
+// test
 app.get("/", (req, res) => {
-    res.send("Emotion AI API Running 🚀");
+    res.json({ status: "OK" });
 });
 
-// تحليل المشاعر
 app.post("/analyze", async (req, res) => {
     try {
-        const { text } = req.body;
+        const text = req.body.text;
 
         if (!text) {
-            return res.status(400).json({ error: "Text is required" });
+            return res.status(400).json({ error: "No text provided" });
         }
 
-        const aiResponse = await axios.post(
+        const response = await axios.post(
             "https://api.openai.com/v1/chat/completions",
             {
                 model: "gpt-4o-mini",
                 messages: [
                     {
-                        role: "system",
-                        content: "أنت محلل نفسي ذكي"
-                    },
-                    {
                         role: "user",
-                        content: `
-حلل النص التالي تحليل عميق:
+                        content: `حلل المشاعر لهذا النص وارجع JSON فقط:
+                        
+النص: ${text}
 
-"${text}"
-
-ارجع JSON فقط:
+الشكل:
 {
-"emotion": "",
-"confidence": 0,
-"secondary_emotion": "",
-"advice": ""
-}
-`
+"emotion": "string",
+"confidence": number,
+"secondary_emotion": "string",
+"advice": "string"
+}`
                     }
                 ]
             },
             {
                 headers: {
-                    "Authorization": `Bearer ${API_KEY}`,
+                    Authorization: `Bearer ${API_KEY}`,
                     "Content-Type": "application/json"
                 }
             }
         );
 
-        const raw = aiResponse.data.choices[0].message.content;
+        const raw = response.data.choices?.[0]?.message?.content;
+
+        if (!raw) {
+            return res.status(500).json({ error: "Empty AI response" });
+        }
 
         let result;
 
         try {
             result = JSON.parse(raw);
-        } catch {
-            result = { raw };
+        } catch (e) {
+            // fallback لو AI ما رجع JSON صحيح
+            result = {
+                emotion: "غير واضح",
+                confidence: 0,
+                secondary_emotion: "",
+                advice: raw
+            };
         }
 
         res.json(result);
 
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).json({ error: "Server error" });
+    } catch (error) {
+        console.error("ERROR:", error.response?.data || error.message);
+        res.status(500).json({
+            error: "Server crashed",
+            details: error.response?.data || error.message
+        });
     }
 });
 
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log("Server running on", PORT);
 });
